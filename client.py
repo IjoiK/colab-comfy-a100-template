@@ -42,6 +42,9 @@ class ComfyUIColabClient:
             with urllib.request.urlopen(req, timeout=30) as res:
                 result = json.loads(res.read().decode("utf-8"))
                 return result.get("prompt_id")
+        except urllib.error.HTTPError as e:
+            print(f"[HTTP Error {e.code}] Failed to queue prompt: {e.read().decode('utf-8', errors='replace')}")
+            return None
         except Exception as e:
             print(f"[Error] Failed to queue prompt: {e}")
             return None
@@ -57,7 +60,7 @@ class ComfyUIColabClient:
         except Exception:
             return None
 
-    def wait_for_completion(self, prompt_id: str, poll_interval: int = 5, timeout: int = 600) -> Optional[Dict[str, Any]]:
+    def wait_for_completion(self, prompt_id: str, poll_interval: int = 5, timeout: int = 1800) -> Optional[Dict[str, Any]]:
         """Polls until the video generation is completed and returns outputs."""
         print(f"⏳ Waiting for generation job {prompt_id} to finish...")
         start_time = time.time()
@@ -79,20 +82,34 @@ class ComfyUIColabClient:
         })
         return f"{self.base_url}/view?{query}"
 
+    def download_output(self, filename: str, dest_path: str, subfolder: str = "", folder_type: str = "output") -> str:
+        """Downloads a generated video/image file from ComfyUI to a local path."""
+        url = self.get_output_file_url(filename, subfolder=subfolder, folder_type=folder_type)
+        urllib.request.urlretrieve(url, dest_path)
+        print(f"💾 Saved output to: {dest_path}")
+        return dest_path
+
 
 def create_minimax_t2v_prompt(
     positive_prompt: str,
-    negative_prompt: str = "distorted, low quality, watermark, glitch",
-    width: int = 1280,
-    height: int = 720,
-    frames: int = 121,
+    negative_prompt: str = "blurry, distorted anatomy, glitch, low quality, fast jump cuts, watermark",
+    width: int = 1344,
+    height: int = 768,
+    frames: int = 124,
     steps: int = 25,
-    seed: int = 42
+    cfg: float = 6.0,
+    seed: int = 42,
+    use_turbo_lora: bool = False,
+    filename_prefix: str = "minimax_h3_output"
 ) -> Dict[str, Any]:
     """
-    Constructs an API-compatible prompt structure for MiniMax-H3 Text-to-Video.
+    Constructs an official MiniMax-H3 API workflow structure for ComfyUI.
+    Supports optional 8-step Turbo LoRA (`use_turbo_lora=True`, recommended steps=8).
     """
-    return {
+    if use_turbo_lora and steps == 25:
+        steps = 8
+
+    workflow: Dict[str, Any] = {
         "1": {
             "class_type": "UNETLoader",
             "inputs": {
@@ -118,40 +135,58 @@ def create_minimax_t2v_prompt(
             "inputs": {
                 "vae_name": "minimax_h3_audio_vae_fp32.safetensors"
             }
-        },
-        "5": {
-            "class_type": "CLIPTextEncode",
+        }
+    }
+
+    model_source = ["1", 0]
+    if use_turbo_lora:
+        workflow["12"] = {
+            "class_type": "LoraLoaderModelOnly",
             "inputs": {
-                "text": positive_prompt,
-                "clip": ["2", 0]
+                "model": ["1", 0],
+                "lora_name": "minimax_h3_fl2v_turbo_8step_v1.0_768p_bf16.safetensors",
+                "strength_model": 1.0
+            }
+        }
+        model_source = ["12", 0]
+
+    workflow.update({
+        "5": {
+            "class_type": "MiniMaxH3SigmaShift",
+            "inputs": {
+                "model": model_source,
+                "shift_video": 12.0,
+                "shift_audio": 3.0
             }
         },
         "6": {
+            "class_type": "MiniMaxH3ImageToVideo",
+            "inputs": {
+                "clip": ["2", 0],
+                "vae": ["3", 0],
+                "prompt": positive_prompt,
+                "width": width,
+                "height": height,
+                "length": frames
+            }
+        },
+        "7": {
             "class_type": "CLIPTextEncode",
             "inputs": {
                 "text": negative_prompt,
                 "clip": ["2", 0]
             }
         },
-        "7": {
-            "class_type": "EmptyLatentVideo",
-            "inputs": {
-                "width": width,
-                "height": height,
-                "length": frames,
-                "batch_size": 1
-            }
-        },
         "8": {
             "class_type": "KSampler",
             "inputs": {
-                "model": ["1", 0],
-                "positive": ["5", 0],
-                "negative": ["6", 0],
-                "latent_image": ["7", 0],
+                "model": ["5", 0],
+                "positive": ["6", 0],
+                "negative": ["7", 0],
+                "latent_image": ["6", 1],
                 "seed": seed,
                 "steps": steps,
-                "cfg": 6.0,
+                "cfg": cfg,
                 "sampler_name": "euler",
                 "scheduler": "normal",
                 "denoise": 1.0
@@ -165,10 +200,19 @@ def create_minimax_t2v_prompt(
             }
         },
         "10": {
-            "class_type": "SaveVideo",
+            "class_type": "CreateVideo",
             "inputs": {
                 "images": ["9", 0],
-                "filename_prefix": "minimax_output"
+                "fps": 24.0
+            }
+        },
+        "11": {
+            "class_type": "SaveVideo",
+            "inputs": {
+                "video": ["10", 0],
+                "filename_prefix": filename_prefix,
+                "format": "mp4"
             }
         }
-    }
+    })
+    return workflow
