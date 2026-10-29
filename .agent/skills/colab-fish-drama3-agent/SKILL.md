@@ -42,6 +42,6 @@ client.generate_speech(
 ### Pattern 2: Browser Automation
 
 1. Open the notebook in Google Colab:
-   `https://colab.research.google.com/github/IjoiK/colab-comfy-a100-template/blob/main/fish-audio-drama-3/colab_fish_drama3_a100.ipynb`
-2. Select runtime **A100 GPU** and run all cells (`Ctrl+F9`).
+   `https://colab.research.google.com/github/IjoiK/colab-comfy-a100-template/blob/main/fish-audio-drama-3/colab_fish_drama3_g4_96gb.ipynb`
+2. Select runtime **G4 GPU (96 GB)** and run all cells (`Ctrl+F9`).
 3. Extract the Pinggy or Cloudflare tunnel URL from Step 4 and use `fish-audio-drama-3/client.py` to generate audio.
