@@ -199,10 +199,18 @@ def create_minimax_t2v_prompt(
                 "vae": ["3", 0]
             }
         },
+        "13": {
+            "class_type": "VAEDecodeAudio",
+            "inputs": {
+                "samples": ["8", 0],
+                "vae": ["4", 0]
+            }
+        },
         "10": {
             "class_type": "CreateVideo",
             "inputs": {
                 "images": ["9", 0],
+                "audio": ["13", 0],
                 "fps": 24.0
             }
         },

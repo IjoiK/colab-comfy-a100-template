@@ -1,3 +1,7 @@
 # Ignore local draft articles
 zenn_article_*.md
 *.draft.md
+
+# Ignore generated videos and Python cache
+*.mp4
+__pycache__/
