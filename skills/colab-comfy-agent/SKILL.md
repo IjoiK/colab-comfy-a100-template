@@ -25,8 +25,10 @@ When the user asks for a video in natural language (e.g., in Russian or English)
 
 When the Colab notebook is already running and the user provides a `https://xxxx.trycloudflare.com` URL:
 
-1. Verify endpoint health and submit the job using `client.py`:
+1. Verify endpoint health and submit the job using `minimax-h3-comfyui/client.py`:
    ```python
+   import sys
+   sys.path.insert(0, "minimax-h3-comfyui")
    from client import ComfyUIColabClient, create_minimax_t2v_prompt
 
    client = ComfyUIColabClient(base_url="https://your-tunnel.trycloudflare.com")
@@ -69,7 +71,7 @@ When the Colab notebook is already running and the user provides a `https://xxxx
 
 If the user asks to launch the Colab notebook from scratch:
 1. Open the Google Colab notebook URL:
-   `https://colab.research.google.com/github/IjoiK/colab-comfy-a100-template/blob/main/colab_comfy_minimax_h3_a100.ipynb`
+   `https://colab.research.google.com/github/IjoiK/colab-comfy-a100-template/blob/main/minimax-h3-comfyui/colab_comfy_minimax_h3_a100.ipynb`
 2. Select runtime: **Runtime** -> **Change runtime type** -> **A100 GPU**.
 3. Trigger **Run all cells** (`Ctrl+F9`).
 4. Monitor the stdout of **Step 4** until `ComfyUI is LIVE: https://xxxx.trycloudflare.com` appears.
